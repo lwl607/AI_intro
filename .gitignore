@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+build/
+*.o
+*.exe
+.DS_Store
+*.mex* 
+venv/
