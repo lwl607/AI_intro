@@ -313,6 +313,9 @@ class SentimentClassifier(PreTrainedModel):
         feat = self.dropout(self.norm(feat))
         logits = self.head(feat)
         result = {"logits": logits}
+        print("logits:", logits.shape)
+        print("labels:", labels.shape)
+
         if labels is not None:
             result["loss"] = self.loss_fn(logits, labels)
         return result
@@ -477,45 +480,6 @@ def train(
             optimizer.zero_grad()
 
             outputs = model(**batch)
-            loss = outputs["loss"]
-            
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
-            optimizer.step()
-            scheduler.step()
-
-            running_loss += loss.item()
-            # Display
-            pbar.set_postfix(loss=f"{running_loss/(pbar.n or 1):.4f}")
-
-        # Validation Phase
-        val_acc, _, _ = evaluate(model, dl_val)
-        print(f"Epoch {epoch}: Val Acc = {val_acc:.4f}")
-
-        # Save best model checkpoint
-        if val_acc > best_val:
-            best_val = val_acc
-            model.save_pretrained(ckpt_dir)
-
-    # 6. Evaluation and save results and metrics
-    best = SentimentClassifier.from_pretrained(ckpt_dir).to(DEVICE)
-
-    def eval(split, dl):
-        acc, y, yhat = evaluate(best, dl)
-        '''
-        Save confusion matrix and classification report (you should plot the result prettier)
-
-        Example:
-        cm = confusion_matrix(y, yhat, labels=[0,1,2])
-        pd.DataFrame(cm).to_csv(os.path.join(ckpt_dir, f"{split}_cm.csv"))
-        rpt = classification_report(y, yhat, digits=4, labels=[0,1,2])
-        with open(os.path.join(ckpt_dir, f"{split}_report.txt"), "w") as f:
-            f.write(rpt)
-        '''
-        return float(acc)
-
-    train_acc = eval("train", dl_train)
     val_acc   = eval("val", dl_val)
     test_acc  = eval("test", dl_test)
 
