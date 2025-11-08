@@ -133,14 +133,14 @@ class SentimentDataset(Dataset):
         input_ids = enc["input_ids"].squeeze(0)
         attention_mask = enc["attention_mask"].squeeze(0)
 
-        token_type_ids = enc.get("token_type_ids")
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.squeeze(0)
+        # token_type_ids = enc.get("token_type_ids")
+        # if token_type_ids is not None:
+        #     token_type_ids = token_type_ids.squeeze(0)
 
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
-            "token_type_ids": token_type_ids,
+            # "token_type_ids": token_type_ids,
             "labels": torch.tensor(int(label), dtype=torch.long),
         }
 
