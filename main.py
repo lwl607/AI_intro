@@ -89,11 +89,13 @@ class SentimentDataset(Dataset):
             tokenizer: Pre-trained tokenizer from Hugging Face
             max_length: Maximum token length for padding/truncation
         """
-        pd.read_csv(csv_path)
-        df["text"].tolist(), df["label"].tolist()
-        self.
+        df = pd.read_csv(csv_path)
+        self.texts = df["text"].tolist()
+        self.labels = df["label"].tolist()
+        self.tokenizer = tokenizer
+        self.max_length = max_length
 
-        pass
+
 
     def __len__(self):
         """
@@ -219,6 +221,13 @@ class SentimentClassifier(PreTrainedModel):
         self.loss_fn = nn.CrossEntropyLoss()
         ...
         """
+        self.encoder = AutoModel.from_pretrained(config.model_name)
+        self.hidden_size = self.encoder.config.hidden_size
+        self.norm = nn.LayerNorm(self.hidden_size)
+        self.head_type = config.head
+        self.head = CustomBlock(self.hidden_size, config.num_labels)
+        self.dropout = nn.Dropout(config.dropout)
+        self.loss_fn = nn.CrossEntropyLoss()
         pass
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None, labels=None):
@@ -249,7 +258,18 @@ class SentimentClassifier(PreTrainedModel):
             result["loss"] = self.loss_fn(logits, labels)
         return result
         """
-        pass
+        outputs = self.encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids
+        )
+        feat = outputs.last_hidden_state
+        feat = self.dropout(self.norm(feat))
+        logits = self.head(feat)
+        result = {"logits": logits}
+        if labels is not None:
+            result["loss"] = self.loss_fn(logits, labels)
+        return result
 
 
 # Evaluation
@@ -278,7 +298,13 @@ def evaluate(model: nn.Module, dataloader: DataLoader) -> Tuple[float, np.ndarra
             - Get predicted class from logits
             - Save ground-truth and predicted labels
             '''
-            pass
+            batch = {k: v.to(DEVICE) for k, v in batch.items()}
+            outputs = model(**batch)
+            logits = outputs["logits"]
+            preds = logits.argmax(dim=-1)
+            all_y.extend(batch["labels"].cpu().numpy())
+            all_pred.extend(preds.cpu().numpy())
+
     acc = accuracy_score(all_y, all_pred)
     return acc, np.array(all_y), np.array(all_pred)
 
@@ -317,6 +343,9 @@ def train(
     ds = SentimentDataset(...)
     dl = DataLoader(...)
     '''
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    ds = SentimentDataset()
+    dl = DataLoader(...)
     
     # 3. Initialize the model
     '''
