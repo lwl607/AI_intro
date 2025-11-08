@@ -89,20 +89,22 @@ class SentimentDataset(Dataset):
             tokenizer: Pre-trained tokenizer from Hugging Face
             max_length: Maximum token length for padding/truncation
         """
+        # Load CSV and extract columns
         df = pd.read_csv(csv_path)
+        # Expecting columns 'text' and 'label'
         self.texts = df["text"].tolist()
         self.labels = df["label"].tolist()
+
+        # Store tokenizer and max length for later tokenization
         self.tokenizer = tokenizer
         self.max_length = max_length
-
-
 
     def __len__(self):
         """
         Returns:
             Total number of samples in the dataset -> HINT: len(self.texts)
         """
-        pass
+        return len(self.texts)
 
     def __getitem__(self, idx):
         """
@@ -114,7 +116,33 @@ class SentimentDataset(Dataset):
         Returns:
             One sample (tokenized text and label)
         """
-        pass
+        # Select the raw text and label
+        text = self.texts[idx]
+        label = self.labels[idx]
+
+        # Tokenize the text. Return tensors as PyTorch tensors and squeeze the batch dim.
+        enc = self.tokenizer(
+            text,
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_length,
+            return_tensors="pt",
+            return_attention_mask=True,
+        )
+
+        input_ids = enc["input_ids"].squeeze(0)
+        attention_mask = enc["attention_mask"].squeeze(0)
+
+        token_type_ids = enc.get("token_type_ids")
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.squeeze(0)
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
+            "labels": torch.tensor(int(label), dtype=torch.long),
+        }
 
 
 # Model Architecture Components
@@ -128,9 +156,12 @@ class CustomBlock(nn.Module):
         - Define any sub-layers you need (e.g., Linear, Conv1d, Dropout).
         - Store any configuration parameters (e.g., hidden size, kernel size).
         """
-        pass
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, input_dim)
 
-    def forward(self): 
+    def forward(self, x): 
         """
         Define how data moves through the block.
 
@@ -145,7 +176,11 @@ class CustomBlock(nn.Module):
         - Use the layers defined in __init__ to process the input.
         - Make sure to return the final output tensor.
         """
-        pass
+
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
 
 
 # Example of Custom Block
@@ -344,8 +379,14 @@ def train(
     dl = DataLoader(...)
     '''
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    ds = SentimentDataset()
-    dl = DataLoader(...)
+    
+    ds_train = SentimentDataset(train_csv, tokenizer, max_length)
+    ds_val   = SentimentDataset(val_csv,   tokenizer, max_length)
+    ds_test  = SentimentDataset(test_csv,  tokenizer, max_length)
+
+    dl_train = DataLoader(ds_train, batch_size=batch_size, shuffle=True,  num_workers=2, pin_memory=True)
+    dl_val   = DataLoader(ds_val,   batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
+    dl_test  = DataLoader(ds_test,  batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
     
     # 3. Initialize the model
     '''
@@ -512,6 +553,29 @@ def main():
         seed=args.seed,
     )
     '''
+    # train/val split
+    full = pd.read_csv(./dataset/dataset.csv)
+
+    train_df, val_df = train_test_split(...)
+    os.makedirs(arg.out_dir, exist_ok=True)
+    train_split = os.path.join(...)
+    val_split = os.path.join(...)
+    train_df.to_csv(...)
+    val_df.to_csv(...)
+
+    # Start training
+    train(
+        model_name=args.model_name,
+        train_csv=train_split,
+        val_csv=val_split,
+        test_csv=args.test_csv,
+        out_dir=args.out_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        max_length=args.max_length,
+                                     # any other hyperparameters you want to add (e.g., learning rate, dropout, etc.)
+        seed=args.seed,
+    )
 
 if __name__ == "__main__":
     main()
