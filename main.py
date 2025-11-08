@@ -133,14 +133,14 @@ class SentimentDataset(Dataset):
         input_ids = enc["input_ids"].squeeze(0)
         attention_mask = enc["attention_mask"].squeeze(0)
 
-        # token_type_ids = enc.get("token_type_ids")
-        # if token_type_ids is not None:
-        #     token_type_ids = token_type_ids.squeeze(0)
+        token_type_ids = enc.get("token_type_ids")
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.squeeze(0)
 
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
-            # "token_type_ids": token_type_ids,
+            "token_type_ids": token_type_ids,
             "labels": torch.tensor(int(label), dtype=torch.long),
         }
 
@@ -309,14 +309,14 @@ class SentimentClassifier(PreTrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )
-        feat = outputs.last_hidden_state
-        print("feat:", feat.shape)
+        feat = outputs.last_hidden_state[:, 0, :]
         feat = self.dropout(self.norm(feat))
 
         logits = self.head(feat)
         result = {"logits": logits}
-        print("logits:", logits.shape)
-        print("labels:", labels.shape)
+        # print("feat:", feat.shape)
+        # print("logits:", logits.shape)
+        # print("labels:", labels.shape)
 
         if labels is not None:
             result["loss"] = self.loss_fn(logits, labels)
@@ -483,6 +483,7 @@ def train(
             optimizer.zero_grad()
 
             outputs = model(**batch)
+    print("train complete")
     val_acc   = eval("val", dl_val)
     test_acc  = eval("test", dl_test)
 
@@ -572,15 +573,22 @@ def main():
     # train/val split
     full = pd.read_csv("./dataset/dataset.csv")
 
-    train_df, val_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
+    train_df, temp_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
+
+    # --- Second split: 10% val, 10% test ---
+    val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=args.seed, stratify=temp_df["label"])
     os.makedirs(args.out_dir, exist_ok=True)
 
     train_split = os.path.join(args.out_dir, "train_split.csv")
     val_split = os.path.join(args.out_dir, "val_split.csv")
+    test_df.to_csv(args.test_csv, index=False)
 
     train_df.to_csv(train_split, index=False)
     val_df.to_csv(val_split, index=False)
-    print("train/val split done")
+    print("split complete")
+    print(f"  Train: {len(train_df)} samples")
+    print(f"  Val  : {len(val_df)} samples")
+    print(f"  Test : {len(test_df)} samples")
 
     # Start training
     train(
