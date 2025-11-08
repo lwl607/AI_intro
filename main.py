@@ -147,8 +147,8 @@ class SentimentDataset(Dataset):
 
 # Model Architecture Components
 class CustomBlock(nn.Module): 
-    def __init__(self, input_dim, hidden_dim):
-        """
+    def __init__(self, hidden_size, num_labels):
+        """, 
         Initialize the layers and parameters of this block.
 
         HINTS:
@@ -157,11 +157,11 @@ class CustomBlock(nn.Module):
         - Store any configuration parameters (e.g., hidden size, kernel size).
         """
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc1 = nn.Linear(hidden_size, 256)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, input_dim)
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
+        self.fc2 = nn.Linear(256, num_labels)
+        self.hidden_size = hidden_size
+        self.num_labels = num_labels
 
     def forward(self, x): 
         """
