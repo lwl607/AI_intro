@@ -147,7 +147,7 @@ class SentimentDataset(Dataset):
 
 # Model Architecture Components
 class CustomBlock(nn.Module): 
-    def __init__(self): 
+    def __init__(self, input_dim, hidden_dim):
         """
         Initialize the layers and parameters of this block.
 
@@ -160,6 +160,8 @@ class CustomBlock(nn.Module):
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, input_dim)
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
 
     def forward(self, x): 
         """
@@ -204,7 +206,7 @@ class SentimentConfig(PretrainedConfig):
 
     def __init__(
         self,
-        model_name="...", # name of pre-trained model backbone
+        model_name="bert-base-uncased", # name of pre-trained model backbone
         num_labels=3,     # number of output classes (Negative, Neutral, Positive)
         head="mlp",       # classifier head
                           # other hyperparameters
@@ -212,6 +214,10 @@ class SentimentConfig(PretrainedConfig):
     ):
         # Always call the parent class initializer first
         super().__init__(**kwargs)
+        self.model_name = model_name
+        self.num_labels = num_labels
+        self.head = head
+        
         '''
         Save all hyperparameters to self
         
@@ -394,6 +400,8 @@ def train(
     config = SentimentConfig(...)
     model = SentimentClassifier(...).to(DEVICE)
     '''
+    config = SentimentConfig()
+    model = SentimentClassifier(...).to(DEVICE)
 
     # 4. Set up optimizer and learning rate scheduler
     '''
@@ -556,7 +564,7 @@ def main():
     # train/val split
     full = pd.read_csv(./dataset/dataset.csv)
 
-    train_df, val_df = train_test_split(...)
+    train_df, val_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
     os.makedirs(arg.out_dir, exist_ok=True)
     train_split = os.path.join(...)
     val_split = os.path.join(...)
