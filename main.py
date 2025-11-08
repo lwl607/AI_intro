@@ -210,6 +210,10 @@ class SentimentConfig(PretrainedConfig):
         num_labels=3,     # number of output classes (Negative, Neutral, Positive)
         head="mlp",       # classifier head
                           # other hyperparameters
+        dropout=0.2,
+        lr_encoder=2e-5,
+        lr_head=1e-3,
+        warmup_ratio=0.1,
         **kwargs,
     ):
         # Always call the parent class initializer first
@@ -217,6 +221,7 @@ class SentimentConfig(PretrainedConfig):
         self.model_name = model_name
         self.num_labels = num_labels
         self.head = head
+        self.dropout = dropout
         
         '''
         Save all hyperparameters to self
@@ -361,6 +366,11 @@ def train(
     batch_size: int,
     max_length: int,
                      # any other hyperparameters you want to add (e.g., learning rate, dropout, etc.)
+    head: str,
+    dropout: float,
+    lr_encoder: float,
+    lr_head: float,
+    warmup_ratio: float,
     seed: int = 42,
 ):
     '''
@@ -401,7 +411,7 @@ def train(
     model = SentimentClassifier(...).to(DEVICE)
     '''
     config = SentimentConfig()
-    model = SentimentClassifier(...).to(DEVICE)
+    model = SentimentClassifier(config).to(DEVICE)
 
     # 4. Set up optimizer and learning rate scheduler
     '''
@@ -409,6 +419,22 @@ def train(
     optimizer = optim.AdamW(...)
     scheduler = get_linear_schedule_with_warmup(...)
     '''
+    optimizer = optim.AdamW(
+        model.parameters(),   # parameters to update
+        lr=lr_encoder,              # learning rate
+        betas=(0.9, 0.999),   # coefficients for moving averages
+        eps=1e-8,             # small constant to avoid division by zero
+        weight_decay=0.01     # decoupled L2 regularization strength
+    )
+
+    num_batches_per_epoch = len(dl_train)
+    total_steps = epochs * num_batches_per_epoch
+
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, 
+        num_warmup_steps=warmup_ratio*total_steps, 
+        num_training_steps=total_steps
+    )
 
     # 5. Run the training loop
     best_val = -1.0
@@ -446,6 +472,20 @@ def train(
               -> running_loss += loss.item()
             '''
 
+            batch = {k: v.to(DEVICE) for k, v in batch.items()}
+
+            optimizer.zero_grad()
+
+            outputs = model(**batch)
+            loss = outputs["loss"]
+            
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            scheduler.step()
+
+            running_loss += loss.item()
             # Display
             pbar.set_postfix(loss=f"{running_loss/(pbar.n or 1):.4f}")
 
@@ -511,19 +551,19 @@ def main():
     parser.add_argument("--out_dir", type=str, default="./saved_models/") # DO NOT change the file name
 
     # model / data
-    parser.add_argument("--model_name", type=str, default="...")
-    parser.add_argument("--max_length", type=int, default=int)
-    parser.add_argument("--batch_size", type=int, default=int)
-    parser.add_argument("--epochs", type=int, default=int)
+    parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+    parser.add_argument("--max_length", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=3)
 
     # architecture
     parser.add_argument("--head", type=str, choices=["mlp"], default="mlp")
-    parser.add_argument("--dropout", type=float, default=float)
+    parser.add_argument("--dropout", type=float, default=0.2)
 
     # optimization
-    parser.add_argument("--lr_encoder", type=float, default=float)
-    parser.add_argument("--lr_head", type=float, default=float)
-    parser.add_argument("--warmup_ratio", type=float, default=float)
+    parser.add_argument("--lr_encoder", type=float, default=2e-5)
+    parser.add_argument("--lr_head", type=float, default=1e-3)
+    parser.add_argument("--warmup_ratio", type=float, default=0.1)
 
     # Setup
     parser.add_argument("--seed", type=int, default=42)
@@ -557,19 +597,23 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         max_length=args.max_length,
+
                                      # any other hyperparameters you want to add (e.g., learning rate, dropout, etc.)
         seed=args.seed,
     )
     '''
     # train/val split
-    full = pd.read_csv(./dataset/dataset.csv)
+    full = pd.read_csv("./dataset/dataset.csv")
 
     train_df, val_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
-    os.makedirs(arg.out_dir, exist_ok=True)
-    train_split = os.path.join(...)
-    val_split = os.path.join(...)
-    train_df.to_csv(...)
-    val_df.to_csv(...)
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    train_split = os.path.join(args.out_dir, "train_split.csv")
+    val_split = os.path.join(args.out_dir, "val_split.csv")
+
+    train_df.to_csv(train_split, index=False)
+    val_df.to_csv(val_split, index=False)
+    print("train/val split done")
 
     # Start training
     train(
@@ -582,6 +626,12 @@ def main():
         batch_size=args.batch_size,
         max_length=args.max_length,
                                      # any other hyperparameters you want to add (e.g., learning rate, dropout, etc.)
+        head=args.head,
+        dropout=args.dropout,
+        lr_encoder=args.lr_encoder,
+        lr_head=args.lr_head,
+        warmup_ratio=args.warmup_ratio,
+
         seed=args.seed,
     )
 
