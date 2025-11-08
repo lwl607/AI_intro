@@ -89,22 +89,18 @@ class SentimentDataset(Dataset):
             tokenizer: Pre-trained tokenizer from Hugging Face
             max_length: Maximum token length for padding/truncation
         """
-        # Load CSV and extract columns
-        df = pd.read_csv(csv_path)
-        # Expecting columns 'text' and 'label'
-        self.texts = df["text"].tolist()
-        self.labels = df["label"].tolist()
+        pd.read_csv(csv_path)
+        df["text"].tolist(), df["label"].tolist()
+        self.
 
-        # Store tokenizer and max length for later tokenization
-        self.tokenizer = tokenizer
-        self.max_length = max_length
+        pass
 
     def __len__(self):
         """
         Returns:
             Total number of samples in the dataset -> HINT: len(self.texts)
         """
-        return len(self.texts)
+        pass
 
     def __getitem__(self, idx):
         """
@@ -116,33 +112,7 @@ class SentimentDataset(Dataset):
         Returns:
             One sample (tokenized text and label)
         """
-        # Select the raw text and label
-        text = self.texts[idx]
-        label = self.labels[idx]
-
-        # Tokenize the text. Return tensors as PyTorch tensors and squeeze the batch dim.
-        enc = self.tokenizer(
-            text,
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
-            return_attention_mask=True,
-        )
-
-        input_ids = enc["input_ids"].squeeze(0)
-        attention_mask = enc["attention_mask"].squeeze(0)
-
-        token_type_ids = enc.get("token_type_ids")
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.squeeze(0)
-
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "token_type_ids": token_type_ids,
-            "labels": torch.tensor(int(label), dtype=torch.long),
-        }
+        pass
 
 
 # Model Architecture Components
@@ -156,12 +126,9 @@ class CustomBlock(nn.Module):
         - Define any sub-layers you need (e.g., Linear, Conv1d, Dropout).
         - Store any configuration parameters (e.g., hidden size, kernel size).
         """
-        super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, input_dim)
+        pass
 
-    def forward(self, x): 
+    def forward(self): 
         """
         Define how data moves through the block.
 
@@ -176,11 +143,7 @@ class CustomBlock(nn.Module):
         - Use the layers defined in __init__ to process the input.
         - Make sure to return the final output tensor.
         """
-
-        out = self.fc1(x)
-        out = self.relu(out)
-        out = self.fc2(out)
-        return out
+        pass
 
 
 # Example of Custom Block
@@ -204,20 +167,14 @@ class SentimentConfig(PretrainedConfig):
 
     def __init__(
         self,
-        model_name="bert-base-uncased", # name of pre-trained model backbone
+        model_name="...", # name of pre-trained model backbone
         num_labels=3,     # number of output classes (Negative, Neutral, Positive)
         head="mlp",       # classifier head
                           # other hyperparameters
-        hidden_size=
-        dropout=0.2,
         **kwargs,
     ):
         # Always call the parent class initializer first
         super().__init__(**kwargs)
-        self.model_name = model_name
-        self.num_labels = num_labels
-        self.head = head
-        
         '''
         Save all hyperparameters to self
         
@@ -262,13 +219,6 @@ class SentimentClassifier(PreTrainedModel):
         self.loss_fn = nn.CrossEntropyLoss()
         ...
         """
-        self.encoder = AutoModel.from_pretrained(config.model_name)
-        self.hidden_size = self.encoder.config.hidden_size
-        self.norm = nn.LayerNorm(self.hidden_size)
-        self.head_type = config.head
-        self.head = CustomBlock(self.hidden_size, config.num_labels)
-        self.dropout = nn.Dropout(config.dropout)
-        self.loss_fn = nn.CrossEntropyLoss()
         pass
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None, labels=None):
