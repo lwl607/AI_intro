@@ -310,7 +310,9 @@ class SentimentClassifier(PreTrainedModel):
             token_type_ids=token_type_ids
         )
         feat = outputs.last_hidden_state
+        print("feat:", feat.shape)
         feat = self.dropout(self.norm(feat))
+
         logits = self.head(feat)
         result = {"logits": logits}
         print("logits:", logits.shape)
