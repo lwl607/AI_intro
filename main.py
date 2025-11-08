@@ -483,7 +483,37 @@ def train(
             optimizer.zero_grad()
 
             outputs = model(**batch)
-    print("train complete")
+            loss = outputs["loss"]
+
+            # Backpropagation
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+            # Optimizer step and scheduler update
+            optimizer.step()
+            scheduler.step()
+
+            # Update running loss
+            running_loss += loss.item()
+
+            # Display average loss so far
+            pbar.set_postfix(loss=f"{running_loss / (pbar.n or 1):.4f}")
+    
+    def eval(split, dl):
+        acc, y, yhat = evaluate(best, dl)
+        '''
+        Save confusion matrix and classification report (you should plot the result prettier)
+
+        Example:
+        cm = confusion_matrix(y, yhat, labels=[0,1,2])
+        pd.DataFrame(cm).to_csv(os.path.join(ckpt_dir, f"{split}_cm.csv"))
+        rpt = classification_report(y, yhat, digits=4, labels=[0,1,2])
+        with open(os.path.join(ckpt_dir, f"{split}_report.txt"), "w") as f:
+            f.write(rpt)
+        '''
+        return float(acc)
+
+    train_acc = eval("train", dl_train)
     val_acc   = eval("val", dl_val)
     test_acc  = eval("test", dl_test)
 
@@ -507,7 +537,6 @@ def train(
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
 
 # Main
 
@@ -571,24 +600,17 @@ def main():
     )
     '''
     # train/val split
-    full = pd.read_csv("./dataset/dataset.csv")
+    full = pd.read_csv(args.train_csv)
 
-    train_df, temp_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
-
-    # --- Second split: 10% val, 10% test ---
-    val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=args.seed, stratify=temp_df["label"])
+    train_df, val_df = train_test_split(full, test_size=0.2, random_state=args.seed, stratify=full["label"])
     os.makedirs(args.out_dir, exist_ok=True)
 
     train_split = os.path.join(args.out_dir, "train_split.csv")
     val_split = os.path.join(args.out_dir, "val_split.csv")
-    test_df.to_csv(args.test_csv, index=False)
 
     train_df.to_csv(train_split, index=False)
     val_df.to_csv(val_split, index=False)
-    print("split complete")
-    print(f"  Train: {len(train_df)} samples")
-    print(f"  Val  : {len(val_df)} samples")
-    print(f"  Test : {len(test_df)} samples")
+    print("train/val split done")
 
     # Start training
     train(
