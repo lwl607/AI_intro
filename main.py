@@ -498,6 +498,10 @@ def train(
 
             # Display average loss so far
             pbar.set_postfix(loss=f"{running_loss / (pbar.n or 1):.4f}")
+        # 6. Evaluation and save results and metrics
+    
+    # 6. Evaluation and save results and metrics
+    best = SentimentClassifier.from_pretrained(ckpt_dir).to(DEVICE)
     
     def eval(split, dl):
         acc, y, yhat = evaluate(best, dl)
