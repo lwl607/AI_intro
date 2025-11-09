@@ -511,6 +511,11 @@ def train(
         with open(os.path.join(ckpt_dir, f"{split}_report.txt"), "w") as f:
             f.write(rpt)
         '''
+        cm = confusion_matrix(y, yhat, labels=[0,1,2])
+        pd.DataFrame(cm).to_csv(os.path.join(ckpt_dir, f"{split}_cm.csv"))
+        rpt = classification_report(y, yhat, digits=4, labels=[0,1,2])
+        with open(os.path.join(ckpt_dir, f"{split}_report.txt"), "w") as f:
+            f.write(rpt)
         return float(acc)
 
     train_acc = eval("train", dl_train)
